@@ -350,7 +350,7 @@ class DiagramViewer {
       const res = await fetch('/api/diagram');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const rawDiagram = data.diagram || '';
+      const rawDiagram = data.mermaid || data.diagram || '';
 
       // Clean diagram fences
       let diagramCode = rawDiagram.trim();
@@ -509,9 +509,9 @@ class ChatController {
       }
 
       const data = await res.json();
-      const author = data.author || 'coordinator';
-      const responseText = data.response || 'No response returned from agent.';
-      const toolCalls = data.tool_calls || [];
+      const author = data.worker || data.author || 'coordinator';
+      const responseText = data.message || data.response || 'No response returned from agent.';
+      const toolCalls = data.tools_used || data.tool_calls || [];
 
       // Highlight the worker who handled this
       if (this.routingVisualizer && author !== 'coordinator') {
@@ -582,6 +582,9 @@ class ChatController {
     if (toolCalls && toolCalls.length > 0) {
       const toolPills = toolCalls
         .map((tc) => {
+          if (typeof tc === 'string') {
+            return `<div><span style="color: #38BDF8;">⚡ tool:</span> ${this.escapeHtml(tc)}</div>`;
+          }
           const name = tc.tool || 'custom_tool';
           const args = tc.args ? JSON.stringify(tc.args) : '';
           return `<div><span style="color: #38BDF8;">⚡ ${name}</span> ${this.escapeHtml(args)}</div>`;
@@ -749,7 +752,7 @@ class HealthModalController {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (this.codeOutput) {
-        this.codeOutput.textContent = data.health || JSON.stringify(data, null, 2);
+        this.codeOutput.textContent = data.report || data.health || JSON.stringify(data, null, 2);
       }
     } catch (err) {
       if (this.codeOutput) {
@@ -771,13 +774,13 @@ class HealthModalController {
       const data = await res.json();
 
       const pineconePill = document.getElementById('pinecone-pill');
-      if (pineconePill && data.pinecone_connected) {
+      if (pineconePill && (data.vector_db || data.pinecone_connected)) {
         pineconePill.style.borderColor = 'rgba(16, 185, 129, 0.5)';
         pineconePill.style.color = '#34D399';
       }
 
       const nvidiaPill = document.getElementById('nvidia-pill');
-      if (nvidiaPill && data.nvidia_configured) {
+      if (nvidiaPill && (data.model || data.nvidia_configured)) {
         nvidiaPill.style.borderColor = 'rgba(16, 185, 129, 0.5)';
         nvidiaPill.style.color = '#34D399';
       }

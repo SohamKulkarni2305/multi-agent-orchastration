@@ -54,3 +54,22 @@ def test_api_chat_endpoint(client):
     assert "worker_name" in data
     assert "message" in data
     assert data["worker"] == "code_searcher"
+
+
+def test_static_assets_served(client):
+    # Test index.html served at root
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+    assert "Multi-Agent Code Helper" in res_root.text
+    assert "routing-canvas" in res_root.text
+
+    # Test CSS served
+    res_css = client.get("/style.css")
+    assert res_css.status_code == 200
+    assert "--bg-primary" in res_css.text
+
+    # Test JS served
+    res_js = client.get("/app.js")
+    assert res_js.status_code == 200
+    assert "RoutingVisualizer" in res_js.text
+
