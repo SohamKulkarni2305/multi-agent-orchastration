@@ -1,0 +1,30 @@
+# Python & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.pytest_cache/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment Secrets
+.env
+.env.local
+.env.*.local
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vector DB local caches
+data/local_vector_db.json
+
+# ADK runtime cache
+.adk/
+code_helper/.adk/
