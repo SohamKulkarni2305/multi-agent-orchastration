@@ -37,7 +37,9 @@ def create_explainer_agent(
 
     tools: list[Any] = [get_function_source, list_functions_and_classes, calculate_code_metrics]
     if enable_mcp:
-        tools.append(get_filesystem_mcp_toolset("."))
+        mcp_toolset = get_filesystem_mcp_toolset(".")
+        if mcp_toolset is not None:
+            tools.append(mcp_toolset)
 
     return LlmAgent(
         name="code_explainer",

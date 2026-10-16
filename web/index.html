@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Multi-Agent Code Helper Studio</title>
-  <meta name="description" content="Modern AI Agent Studio for the Multi-Agent Code Helper. Hierarchical multi-agent orchestration, Pinecone vector RAG, and AST code intelligence.">
+  <meta name="description" content="Modern AI Agent Studio for the Multi-Agent Code Helper. Codebase upload, hierarchical multi-agent orchestration, Pinecone vector RAG, and AST code intelligence.">
   
   <!-- Modern Typography (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,26 +28,42 @@
         </div>
         <div class="brand-text">
           <h1>Multi-Agent Code Helper <span class="badge-studio">STUDIO</span></h1>
-          <p class="brand-subtitle">Hierarchical Agent Orchestration & Code Intelligence Engine</p>
+          <p class="brand-subtitle">Upload Codebase • Multi-Agent Intelligence • Architecture Flowcharts</p>
         </div>
       </div>
 
+      <!-- Top-Level View Switcher -->
+      <nav class="top-nav-switcher">
+        <button id="nav-btn-chat" class="top-nav-btn active" data-view="chat" title="Switch to Dialogue Console & Agent Team">
+          <i class="fa-solid fa-comments"></i>
+          <span>Studio Chat</span>
+        </button>
+        <button id="nav-btn-diagram" class="top-nav-btn" data-view="diagram" title="Switch to Full-Screen Architecture Diagram">
+          <i class="fa-solid fa-diagram-project"></i>
+          <span>Architecture Diagram</span>
+          <span class="badge-subtle">AST</span>
+        </button>
+      </nav>
+
       <div class="header-badges">
+        <!-- Active Codebase Indicator -->
+        <div class="status-pill status-codebase" id="active-repo-pill" title="Current active codebase">
+          <i class="fa-solid fa-box-archive"></i>
+          <span id="active-repo-name">Workspace (Default)</span>
+          <button id="btn-reset-codebase" class="btn-mini-action" title="Reset to default workspace" style="display:none;">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+        </div>
+
+        <!-- Upload Codebase Action Button -->
+        <button id="btn-open-upload" class="btn-primary-gradient" title="Upload your code to analyze and diagram">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload Codebase</span>
+        </button>
+
         <div class="status-pill status-online" title="5 Agents Ready">
           <span class="status-dot"></span>
           <span>5 Agents Active</span>
-        </div>
-        <div class="status-pill" id="nvidia-pill" title="NVIDIA NIM Active">
-          <i class="fa-solid fa-microchip"></i>
-          <span>NVIDIA NIM</span>
-        </div>
-        <div class="status-pill" id="pinecone-pill" title="Pinecone Serverless Vector Store">
-          <i class="fa-solid fa-database"></i>
-          <span>Pinecone (2048d)</span>
-        </div>
-        <div class="status-pill" id="mcp-pill" title="Model Context Protocol Active">
-          <i class="fa-solid fa-folder-tree"></i>
-          <span>MCP Filesystem</span>
         </div>
         <button id="btn-health-check" class="btn-ghost" title="Run System Diagnostic">
           <i class="fa-solid fa-heart-pulse"></i>
@@ -56,16 +72,34 @@
       </div>
     </header>
 
-    <!-- Main Workspace Split Grid -->
-    <main class="studio-workspace">
-      <!-- Left Column: Visual Orchestration & Diagram Stage -->
+    <!-- VIEW 1: STUDIO CHAT & AGENT TEAM (Active by default) -->
+    <main class="studio-workspace" id="view-studio-chat">
+      <!-- Left Column: Multi-Agent Orchestration & Files Explorer -->
       <section class="visual-stage">
-        <!-- 1. Interactive Multi-Agent Routing Map -->
-        <div class="stage-card routing-card">
+        <!-- Sub-tabs for Left Column -->
+        <div class="stage-tabs-bar">
+          <div class="stage-tabs">
+            <button class="stage-tab-btn active" data-subtab="team" id="subtab-team">
+              <i class="fa-solid fa-network-wired"></i>
+              <span>Multi-Agent Team</span>
+            </button>
+            <button class="stage-tab-btn" data-subtab="files" id="subtab-files">
+              <i class="fa-solid fa-folder-tree"></i>
+              <span>Codebase Files (<span id="files-badge-count">...</span>)</span>
+            </button>
+          </div>
+          <button id="btn-quick-open-diagram" class="btn-ghost-sm" title="Open Full-Screen Architecture View">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>Full Diagram</span>
+          </button>
+        </div>
+
+        <!-- Panel A: Interactive Multi-Agent Routing Map (2x2 Spacious Grid) -->
+        <div class="stage-card routing-card" id="panel-team-map">
           <div class="card-header">
             <div class="card-title">
               <i class="fa-solid fa-diagram-project icon-glow"></i>
-              <h2>Multi-Agent Routing Map</h2>
+              <h2>Multi-Agent Delegation Team</h2>
             </div>
             <span class="card-hint">Live Delegation Hierarchy</span>
           </div>
@@ -83,8 +117,8 @@
               <div class="node-status-ring"></div>
             </div>
 
-            <!-- Worker Nodes Container -->
-            <div class="workers-grid">
+            <!-- Worker Nodes Container (Spacious 2x2 Grid) -->
+            <div class="workers-grid workers-grid-spacious">
               <!-- Worker 1: Code Searcher -->
               <div class="worker-card" id="node-code_searcher" data-agent="code_searcher">
                 <div class="worker-header">
@@ -97,7 +131,7 @@
                   <span class="tool-tag"><i class="fa-solid fa-bolt"></i> rag_search</span>
                   <span class="tool-tag"><i class="fa-solid fa-align-left"></i> find_exact</span>
                 </div>
-                <div class="worker-desc">5-step RAG on Pinecone vectors.</div>
+                <div class="worker-desc">5-step RAG on Pinecone vectors & exact pattern match.</div>
               </div>
 
               <!-- Worker 2: Architecture Mapper (Deterministic, 0 AI) -->
@@ -113,7 +147,7 @@
                   <span class="tool-tag"><i class="fa-solid fa-arrow-down-up-across-line"></i> imports</span>
                   <span class="tool-tag"><i class="fa-solid fa-code"></i> AST symbols</span>
                 </div>
-                <div class="worker-desc">100% deterministic code dependencies.</div>
+                <div class="worker-desc">100% deterministic code dependencies & Mermaid flowcharts.</div>
               </div>
 
               <!-- Worker 3: Onboarding Guide -->
@@ -129,14 +163,14 @@
                   <span class="tool-tag"><i class="fa-solid fa-terminal"></i> run_cmd</span>
                   <span class="tool-tag"><i class="fa-solid fa-key"></i> env_vars</span>
                 </div>
-                <div class="worker-desc">Setup, health, and codebase orientation.</div>
+                <div class="worker-desc">Setup instructions, prerequisites, and entrypoints.</div>
               </div>
 
               <!-- Worker 4: Code Explainer -->
               <div class="worker-card" id="node-code_explainer" data-agent="code_explainer">
                 <div class="worker-header">
                   <span class="worker-icon explainer-icon"><i class="fa-solid fa-book-open"></i></span>
-                  <span class="badge-type badge-mcp">MCP Filesystem</span>
+                  <span class="badge-type badge-mcp">AI Code Analyst</span>
                 </div>
                 <div class="worker-name">Code Explainer</div>
                 <div class="worker-id">code_explainer</div>
@@ -144,33 +178,27 @@
                   <span class="tool-tag"><i class="fa-solid fa-file-code"></i> read_file</span>
                   <span class="tool-tag"><i class="fa-solid fa-code-branch"></i> function_source</span>
                 </div>
-                <div class="worker-desc">In-depth logic analysis via MCP.</div>
+                <div class="worker-desc">Deep line-by-line algorithm and logic explanation.</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 2. Live Architecture Mermaid Diagram Viewer -->
-        <div class="stage-card diagram-card">
+        <!-- Panel B: Codebase Files Browser -->
+        <div class="stage-card files-card" id="panel-files-browser" style="display: none;">
           <div class="card-header">
             <div class="card-title">
-              <i class="fa-solid fa-chart-line icon-glow"></i>
-              <h2>Live Architecture Graph</h2>
+              <i class="fa-solid fa-folder-tree icon-glow"></i>
+              <h2>Active Codebase Explorer</h2>
             </div>
-            <div class="diagram-toolbar">
-              <button id="btn-zoom-in" class="btn-icon" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-              <button id="btn-zoom-out" class="btn-icon" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-              <button id="btn-zoom-reset" class="btn-icon" title="Reset Zoom"><i class="fa-solid fa-compress"></i></button>
-              <button id="btn-refresh-diagram" class="btn-icon" title="Re-fetch Diagram"><i class="fa-solid fa-rotate"></i></button>
+            <div class="files-summary-pill" id="files-summary-text">
+              Loading files...
             </div>
           </div>
-
-          <div class="diagram-viewport" id="diagram-viewport">
-            <div class="diagram-content" id="diagram-container">
-              <div class="diagram-loading">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
-                <span>Generating live dependency flowchart...</span>
-              </div>
+          <div class="files-viewport" id="files-list-container">
+            <div class="files-loading">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+              <span>Scanning codebase source files...</span>
             </div>
           </div>
         </div>
@@ -184,10 +212,12 @@
               <i class="fa-solid fa-terminal icon-glow"></i>
               <h2>Multi-Agent Dialogue Console</h2>
             </div>
-            <button id="btn-clear-chat" class="btn-ghost-sm" title="Clear Conversation">
-              <i class="fa-solid fa-trash-can"></i>
-              <span>Clear</span>
-            </button>
+            <div class="console-actions">
+              <button id="btn-clear-chat" class="btn-ghost-sm" title="Clear Conversation">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Clear</span>
+              </button>
+            </div>
           </div>
 
           <!-- Chat Conversation Stream -->
@@ -203,14 +233,13 @@
                 <span class="message-time">Just now</span>
               </div>
               <div class="message-body">
-                <p>Welcome to the <strong>Multi-Agent Code Helper Studio</strong>! I am the Boss Coordinator. I do not write code directly; I read your intent and delegate to my 4 specialized workers:</p>
-                <ul>
-                  <li><strong>Code Searcher:</strong> Finds where identifiers, constants, and chunks are via Pinecone RAG.</li>
-                  <li><strong>Architecture Mapper:</strong> Analyzes imports and call graphs deterministically (0 AI).</li>
-                  <li><strong>Onboarding Guide:</strong> Explains setup, requirements, and health checks.</li>
-                  <li><strong>Code Explainer:</strong> Inspects whole files and functions via Filesystem MCP.</li>
-                </ul>
-                <p>Pick a quick query below or type your question!</p>
+                <p>Welcome to the <strong>Multi-Agent Code Helper Studio</strong>! You can upload your own codebase or analyze the current workspace.</p>
+                <div class="welcome-features">
+                  <div class="feat-pill"><i class="fa-solid fa-cloud-arrow-up"></i> <strong>Upload Code:</strong> Click "Upload Codebase" to ingest any <code>.zip</code> or Python files.</div>
+                  <div class="feat-pill"><i class="fa-solid fa-diagram-project"></i> <strong>Architecture Flowchart:</strong> Switch to the <em>Architecture Diagram</em> tab above or ask me to draw it.</div>
+                  <div class="feat-pill"><i class="fa-solid fa-comments"></i> <strong>Ask Anything:</strong> Search functions, explain logic, inspect imports, and check metrics.</div>
+                </div>
+                <p>Pick a quick prompt below or type your question!</p>
               </div>
             </div>
           </div>
@@ -218,21 +247,21 @@
           <!-- Quick Action Question Pills -->
           <div class="quick-prompts-bar">
             <span class="pills-label">Quick Prompts:</span>
-            <div class="pills-scroll">
-              <button class="prompt-pill" data-prompt="Where is sliding window chunking defined in the codebase?">
-                <i class="fa-solid fa-magnifying-glass"></i> Where is chunking defined?
+            <div class="pills-scroll" id="prompts-container">
+              <button class="prompt-pill" data-prompt="Generate an architecture diagram of this project.">
+                <i class="fa-solid fa-diagram-project"></i> Draw Architecture Diagram
               </button>
               <button class="prompt-pill" data-prompt="Which files import the config module?">
                 <i class="fa-solid fa-sitemap"></i> Which files import config?
+              </button>
+              <button class="prompt-pill" data-prompt="Where is sliding window chunking defined in the codebase?">
+                <i class="fa-solid fa-magnifying-glass"></i> Where is chunking defined?
               </button>
               <button class="prompt-pill" data-prompt="Explain vector_store.py and how Pinecone is used.">
                 <i class="fa-solid fa-book-open"></i> Explain vector_store.py
               </button>
               <button class="prompt-pill" data-prompt="I am a new engineer, how do I set up and run this project?">
                 <i class="fa-solid fa-compass"></i> How do I get started?
-              </button>
-              <button class="prompt-pill" data-prompt="Generate an architecture diagram of this project.">
-                <i class="fa-solid fa-diagram-project"></i> Generate diagram
               </button>
             </div>
           </div>
@@ -244,7 +273,7 @@
                 <textarea 
                   id="user-input" 
                   rows="1" 
-                  placeholder="Ask a question about the codebase... (e.g., 'Where is chunk_size configured?')"
+                  placeholder="Ask any question about your code or type 'Draw architecture diagram'..."
                   required
                 ></textarea>
                 <button type="submit" id="btn-send" class="btn-send" title="Send (Enter)">
@@ -254,7 +283,7 @@
               <div class="input-footer">
                 <span>Press <strong>Enter</strong> to send, <strong>Shift+Enter</strong> for newline</span>
                 <span id="active-worker-indicator" class="active-worker-badge" style="display:none;">
-                  <span class="pulse-dot"></span> Delegating...
+                  <span class="pulse-dot"></span> Delegating to Agent Team...
                 </span>
               </div>
             </form>
@@ -262,6 +291,111 @@
         </div>
       </section>
     </main>
+
+    <!-- VIEW 2: DEDICATED FULL-SCREEN ARCHITECTURE DIAGRAM (Hidden by default) -->
+    <main class="architecture-fullscreen-view" id="view-architecture-diagram" style="display: none;">
+      <div class="architecture-view-container">
+        <!-- Diagram View Top Toolbar -->
+        <div class="arch-view-header">
+          <div class="arch-header-left">
+            <div class="arch-title-box">
+              <i class="fa-solid fa-diagram-project icon-glow-lg"></i>
+              <div>
+                <h2>Codebase Architecture & Dependency Flowchart</h2>
+                <span class="arch-subtitle">Generated via 100% Deterministic Python AST Analysis (Zero Hallucination)</span>
+              </div>
+            </div>
+            <span class="codebase-tag" id="arch-codebase-tag">Workspace (Default)</span>
+          </div>
+
+          <div class="arch-header-controls">
+            <!-- File Selector for File-Centric Architecture Diagrams -->
+            <div class="arch-file-selector-box">
+              <label for="arch-file-select"><i class="fa-solid fa-file-code"></i></label>
+              <select id="arch-file-select" class="arch-file-dropdown" title="Select a file to view its dedicated architecture diagram">
+                <option value="">🌐 Entire Project (Overview)</option>
+              </select>
+            </div>
+
+            <div class="diagram-toolbar-prominent">
+              <button id="btn-zoom-in" class="btn-tool" title="Zoom In"><i class="fa-solid fa-plus"></i> <span>Zoom In</span></button>
+              <button id="btn-zoom-out" class="btn-tool" title="Zoom Out"><i class="fa-solid fa-minus"></i> <span>Zoom Out</span></button>
+              <button id="btn-zoom-reset" class="btn-tool" title="Reset Zoom"><i class="fa-solid fa-compress"></i> <span>Reset</span></button>
+              <button id="btn-refresh-diagram" class="btn-tool" title="Re-generate Diagram"><i class="fa-solid fa-rotate"></i> <span>Refresh</span></button>
+            </div>
+            <button id="btn-back-to-chat" class="btn-primary-gradient">
+              <i class="fa-solid fa-comments"></i>
+              <span>Back to Studio Chat</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Full-screen Canvas Viewport -->
+        <div class="arch-viewport" id="diagram-viewport">
+          <div class="diagram-content" id="diagram-container">
+            <div class="diagram-loading">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+              <span>Generating live dependency flowchart...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal for Uploading Codebase -->
+  <div id="modal-upload" class="modal-backdrop" style="display: none;">
+    <div class="modal-window modal-window-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-cloud-arrow-up icon-glow"></i>
+          <h3>Upload Your Codebase</h3>
+        </div>
+        <button id="btn-close-upload-modal" class="btn-icon"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Upload your project repository as a <strong>.zip archive</strong> or select individual <strong>.py files</strong>.
+          The multi-agent system will immediately parse the AST, draw the architecture flowchart, and enable intelligent Q&A.
+        </p>
+
+        <!-- Dropzone -->
+        <div class="upload-dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".zip,.py" multiple style="display:none;">
+          <div class="dropzone-content">
+            <div class="dropzone-icon"><i class="fa-solid fa-file-zipper"></i></div>
+            <h4>Drag & drop your codebase here</h4>
+            <p>or <button type="button" class="btn-text-action" id="btn-browse-files">browse files on your computer</button></p>
+            <span class="dropzone-hint">Supports .zip repository archives or individual Python (.py) files</span>
+          </div>
+        </div>
+
+        <!-- Upload Status / Progress -->
+        <div id="upload-status" class="upload-status-box" style="display: none;">
+          <div class="status-indicator">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <span id="upload-status-text">Ingesting codebase...</span>
+          </div>
+        </div>
+
+        <!-- Recent Upload / Active Info -->
+        <div class="active-codebase-card" id="upload-result-box" style="display: none;">
+          <div class="result-header">
+            <i class="fa-solid fa-circle-check text-success"></i>
+            <h4 id="result-title">Codebase Ingested Successfully!</h4>
+          </div>
+          <p id="result-details" class="result-details">8 files indexed (1,240 lines of code).</p>
+          <div class="result-actions">
+            <button id="btn-view-diagram-now" class="btn-primary-sm">
+              <i class="fa-solid fa-diagram-project"></i> View Architecture Diagram
+            </button>
+            <button id="btn-ask-question-now" class="btn-ghost-sm">
+              <i class="fa-solid fa-comments"></i> Ask a Question
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal for Diagnostics & Health -->

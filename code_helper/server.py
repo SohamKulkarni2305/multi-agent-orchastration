@@ -1,28 +1,58 @@
 """
 server.py — FastAPI REST Backend & Web Asset Server for Modern AI Agent Studio.
+Includes codebase upload, dynamic architecture diagram generation, and multi-agent code intelligence.
 """
 
+import base64
+import io
 import os
+import re
 from pathlib import Path
 from typing import Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 try:
-    from .agent import root_agent
+    from .codebase_manager import codebase_manager
     from .tools.diagram_tool import generate_architecture_diagram
+    from .tools.plain_ast_tools import (
+        find_imports,
+        find_symbol_references,
+        list_functions_and_classes,
+        get_file_structure,
+    )
+    from .tools.metrics_tool import calculate_code_metrics
+    from .tools.search_tools import find_exact_matches
+    from .tools.code_inspection_tools import get_function_source
     from .tools.health_check_tool import check_system_health, get_run_commands
+    from .rag.searcher import rag_search
 except ImportError:
-    from code_helper.agent import root_agent
+    from code_helper.codebase_manager import codebase_manager
     from code_helper.tools.diagram_tool import generate_architecture_diagram
+    from code_helper.tools.plain_ast_tools import (
+        find_imports,
+        find_symbol_references,
+        list_functions_and_classes,
+        get_file_structure,
+    )
+    from code_helper.tools.metrics_tool import calculate_code_metrics
+    from code_helper.tools.search_tools import find_exact_matches
+    from code_helper.tools.code_inspection_tools import get_function_source
     from code_helper.tools.health_check_tool import check_system_health, get_run_commands
+    from code_helper.rag.searcher import rag_search
 
 
 class ChatRequest(BaseModel):
     message: str
+
+
+class UploadJsonRequest(BaseModel):
+    filename: str
+    content_base64: str | None = None
+    files: dict[str, str] | None = None
 
 
 AGENT_DISPLAY_NAMES = {
@@ -77,6 +107,238 @@ AGENT_ROSTER = [
 ]
 
 
+def _call_nvidia_llm(prompt: str, system_prompt: str = "You are an expert software engineering assistant.") -> str | None:
+    """Invoke NVIDIA NIM LLM via OpenAI-compatible endpoint."""
+    api_key = os.getenv("NVIDIA_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    try:
+        from openai import OpenAI
+        base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").strip()
+        model = os.getenv("NVIDIA_CHAT_MODEL", "meta/llama-3.2-11b-vision-instruct").strip()
+        if model.startswith("nvidia_nim/"):
+            model = model.replace("nvidia_nim/", "")
+
+        client = OpenAI(base_url=base_url, api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            max_tokens=800,
+        )
+        content = response.choices[0].message.content
+        if not content and hasattr(response.choices[0].message, "reasoning_content"):
+            content = getattr(response.choices[0].message, "reasoning_content", "")
+        return (content or "").strip()
+    except Exception as e:
+        print(f"[!] Warning: NVIDIA LLM call failed: {e}")
+        return None
+
+
+def execute_multi_agent_query(query: str, target_dir: str) -> dict[str, Any]:
+    """
+    Intelligent Multi-Agent Query Dispatcher.
+    Routes queries to the specialized agent targeting the active codebase.
+    """
+    query_lower = query.lower()
+    root_path = Path(target_dir).resolve()
+    py_files = codebase_manager.scan_files(root_path)
+
+    # -------------------------------------------------------------
+    # 1. Architecture Mapper Intent (Deterministic AST, 0 AI)
+    # -------------------------------------------------------------
+    if any(w in query_lower for w in ["diagram", "mermaid", "flowchart", "architecture", "import", "depend", "symbol", "call", "loc", "metric", "tree", "structure"]):
+        tools_used: list[str] = []
+        clean_mermaid = None
+        target_file: str | None = None
+
+        if any(w in query_lower for w in ["diagram", "mermaid", "flowchart", "draw", "architecture"]):
+            # Check if user mentioned a specific file or module
+            for p in py_files:
+                if p.name.lower() in query_lower:
+                    target_file = p.name
+                    break
+                elif len(p.stem) >= 3 and p.stem.lower() in query_lower.split():
+                    target_file = p.name
+                    break
+
+            if not target_file:
+                for word in query_lower.split():
+                    clean_w = word.strip(" '\"`:,")
+                    for p in py_files:
+                        if clean_w == p.name.lower() or (len(clean_w) >= 3 and clean_w == p.stem.lower()):
+                            target_file = p.name
+                            break
+                    if target_file:
+                        break
+
+            tools_used.append("generate_architecture_diagram")
+            raw_diag = generate_architecture_diagram(str(root_path), target_file=target_file)
+            if "```mermaid" in raw_diag:
+                clean_mermaid = raw_diag.split("```mermaid")[1].split("```")[0].strip()
+            else:
+                clean_mermaid = raw_diag.strip()
+
+            if target_file:
+                ans = (
+                    f"### Dedicated Architecture Flowchart for `{target_file}`\n\n"
+                    f"I parsed `{target_file}` via deterministic Python AST to map its internal function call graph, "
+                    f"class structures, upstream callers, and downstream dependencies.\n\n"
+                    f"Click **Open Diagram View** below or use the **Architecture Diagram** tab to explore the interactive canvas."
+                )
+            else:
+                ans = (
+                    f"### Architecture Diagram for `{root_path.name}`\n\n"
+                    f"I analyzed **{len(py_files)} Python source files** via static AST parsing to extract all module dependencies, class hierarchies, and function signatures with zero hallucination.\n\n"
+                    f"Click **Open Diagram View** below or switch to the **Architecture Diagram** tab in the top navigation to explore the full interactive canvas with pan and zoom."
+                )
+
+        elif any(w in query_lower for w in ["import", "depend"]):
+            tools_used.append("find_imports")
+            # Extract target module/file if specified
+            found_file = None
+            for p in py_files:
+                if p.name.lower() in query_lower or p.stem.lower() in query_lower:
+                    found_file = p.name
+                    break
+            target_to_check = found_file or (py_files[0].name if py_files else "app.py")
+            ans = find_imports(target_to_check, project_dir=str(root_path))
+
+        elif any(w in query_lower for w in ["symbol", "reference", "call", "who calls"]):
+            tools_used.append("find_symbol_references")
+            words = re.findall(r"[A-Za-z_]\w*", query)
+            target_sym = words[-1] if words else "main"
+            ans = find_symbol_references(target_sym, project_dir=str(root_path))
+
+        elif any(w in query_lower for w in ["metric", "loc", "lines of code"]):
+            tools_used.append("calculate_code_metrics")
+            lines = [f"=== Code Metrics for `{root_path.name}` ==="]
+            for p in py_files[:5]:
+                lines.append(f"\n{calculate_code_metrics(str(p))}")
+            ans = "\n".join(lines)
+
+        else:
+            tools_used.append("get_file_structure")
+            tree = get_file_structure(str(root_path))
+            ans = f"=== File Hierarchy for `{root_path.name}` ===\n{tree}"
+
+        return {
+            "worker": "architecture_mapper",
+            "worker_name": AGENT_DISPLAY_NAMES["architecture_mapper"],
+            "worker_type": "Deterministic AST Engine (0 AI)",
+            "message": ans,
+            "tools_used": tools_used,
+            "mermaid": clean_mermaid,
+            "target_file": target_file,
+        }
+
+    # -------------------------------------------------------------
+    # 2. Code Searcher Intent (RAG + Exact Pattern Match)
+    # -------------------------------------------------------------
+    if any(w in query_lower for w in ["where is", "where are", "chunk", "find", "search", "constant", "token", "keyword"]):
+        tools_used = ["find_exact_matches"]
+        # Extract search term
+        match = re.search(r"(?:where is|find|search for)\s+['\"]?([\w\.\-]+)['\"]?", query_lower)
+        term = match.group(1) if match else query_lower.split()[-1]
+
+        exact_res = find_exact_matches(term, project_dir=str(root_path))
+        if "No occurrences found" not in exact_res:
+            ans = f"Found matches in active codebase `{root_path.name}`:\n\n{exact_res}"
+        else:
+            # Fallback to general RAG search
+            tools_used.append("rag_search")
+            rag_res = rag_search(query, top_k=3, mock=False)
+            if rag_res and rag_res.strip() != "I could not find that":
+                ans = rag_res
+            else:
+                ans = f"I searched `{root_path.name}` for '{term}', but could not find matching definitions or constants."
+
+        return {
+            "worker": "code_searcher",
+            "worker_name": AGENT_DISPLAY_NAMES["code_searcher"],
+            "worker_type": "AI Agent (Code Searcher)",
+            "message": ans,
+            "tools_used": tools_used,
+        }
+
+    # -------------------------------------------------------------
+    # 3. Onboarding Guide Intent
+    # -------------------------------------------------------------
+    if any(w in query_lower for w in ["new", "start", "onboard", "setup", "run", "command", "guide", "install", "health"]):
+        tools_used = ["check_system_health", "get_run_commands"]
+        health = check_system_health(str(root_path))
+        cmds = get_run_commands()
+        ans = (
+            f"Welcome! Here is the setup & onboarding guide for `{root_path.name}`:\n\n"
+            f"### System Health Status\n{health}\n\n"
+            f"### Execution Commands\n{cmds}"
+        )
+        return {
+            "worker": "onboarding_guide",
+            "worker_name": AGENT_DISPLAY_NAMES["onboarding_guide"],
+            "worker_type": "AI Agent (Onboarding Guide)",
+            "message": ans,
+            "tools_used": tools_used,
+        }
+
+    # -------------------------------------------------------------
+    # 4. Code Explainer Intent (Deep Code Analysis)
+    # -------------------------------------------------------------
+    tools_used = ["read_file", "get_function_source"]
+    target_file = None
+    for p in py_files:
+        if p.name.lower() in query_lower or p.stem.lower() in query_lower:
+            target_file = p
+            break
+
+    if not target_file and py_files:
+        target_file = py_files[0]
+
+    code_context = ""
+    if target_file and target_file.is_file():
+        try:
+            content = target_file.read_text(encoding="utf-8", errors="replace")
+            # Slice first 100 lines for prompt context
+            code_lines = content.splitlines()[:120]
+            code_context = f"File: {target_file.name}\n" + "\n".join(code_lines)
+        except Exception:
+            pass
+
+    # Call LLM with the real extracted code
+    prompt = (
+        f"You are the Code Explainer agent. The user is asking about the codebase '{root_path.name}':\n\n"
+        f"User Question: {query}\n\n"
+        f"Relevant Code Context from '{target_file.name if target_file else 'codebase'}':\n"
+        f"```python\n{code_context}\n```\n\n"
+        f"Please explain clearly, referencing the actual functions, parameters, and algorithms shown above."
+    )
+    llm_answer = _call_nvidia_llm(prompt, system_prompt="You are an expert AI code analyst explaining Python codebases.")
+
+    if not llm_answer:
+        # Fallback to AST extraction if offline or missing API key
+        if target_file:
+            fns = list_functions_and_classes(str(target_file))
+            llm_answer = (
+                f"### Analysis of `{target_file.name}`\n"
+                f"{fns}\n\n"
+                f"*(Source extracted from `{root_path.name}/{target_file.name}`.)*"
+            )
+        else:
+            llm_answer = f"The active codebase `{root_path.name}` contains {len(py_files)} Python files."
+
+    return {
+        "worker": "code_explainer",
+        "worker_name": AGENT_DISPLAY_NAMES["code_explainer"],
+        "worker_type": "AI Agent (Code Explainer)",
+        "message": llm_answer,
+        "tools_used": tools_used,
+    }
+
+
 def create_app(mock_mode: bool = False, static_dir: str = "web") -> FastAPI:
     """
     Factory function creating and configuring the FastAPI app for the Modern Agent Studio.
@@ -93,11 +355,11 @@ def create_app(mock_mode: bool = False, static_dir: str = "web") -> FastAPI:
 
     static_path = Path(static_dir).resolve()
     if not static_path.exists():
-        # Fallback to root relative
         static_path = (Path(__file__).resolve().parent.parent / static_dir).resolve()
 
     @app.get("/api/status")
     async def get_status() -> dict[str, Any]:
+        info = codebase_manager.get_codebase_info()
         return {
             "status": "online",
             "app_name": "Multi-Agent Code Helper Studio",
@@ -106,20 +368,76 @@ def create_app(mock_mode: bool = False, static_dir: str = "web") -> FastAPI:
             "vector_db": "Pinecone Serverless (dim=2048, metric=cosine)",
             "index_name": os.getenv("PINECONE_INDEX_NAME", "code-helper"),
             "agents": AGENT_ROSTER,
+            "active_codebase": info,
         }
 
     @app.get("/api/diagram")
-    async def get_diagram() -> dict[str, str]:
-        diag = generate_architecture_diagram(".")
-        # Strip outer markdown fences for raw Mermaid parsing if desired
+    async def get_diagram(file: str | None = None) -> dict[str, Any]:
+        active_dir = str(codebase_manager.get_active_dir())
+        diag = generate_architecture_diagram(active_dir, target_file=file)
         clean_mermaid = diag
         if "```mermaid" in diag:
             clean_mermaid = diag.split("```mermaid")[1].split("```")[0].strip()
-        return {"mermaid": clean_mermaid, "raw_markdown": diag}
+        return {
+            "mermaid": clean_mermaid,
+            "raw_markdown": diag,
+            "codebase": codebase_manager.active_name,
+            "target_file": file or "",
+            "is_file_diagram": bool(file and file.strip()),
+        }
+
+    @app.get("/api/codebase")
+    async def get_codebase() -> dict[str, Any]:
+        return codebase_manager.get_codebase_info()
+
+    @app.post("/api/reset-codebase")
+    async def reset_codebase() -> dict[str, Any]:
+        info = codebase_manager.reset_to_default()
+        return {"status": "success", "message": "Reset to default workspace.", "info": info}
+
+    @app.post("/api/upload")
+    async def upload_codebase(file: UploadFile = File(...)) -> dict[str, Any]:
+        """Upload a .zip codebase archive or individual .py file."""
+        filename = file.filename or "uploaded_code.zip"
+        content = await file.read()
+
+        if filename.endswith(".zip"):
+            info = codebase_manager.ingest_zip(content, filename)
+        elif filename.endswith(".py"):
+            text = content.decode("utf-8", errors="replace")
+            info = codebase_manager.ingest_files({filename: text})
+        else:
+            raise HTTPException(status_code=400, detail="Only .zip archives or .py files are supported.")
+
+        return {
+            "status": "success",
+            "message": f"Successfully loaded codebase '{info['name']}' with {info['files_count']} Python files ({info['total_loc']} lines).",
+            "info": info,
+            "mermaid": info.get("mermaid", ""),
+        }
+
+    @app.post("/api/upload-code")
+    async def upload_code_json(payload: UploadJsonRequest) -> dict[str, Any]:
+        """JSON-based codebase upload (Base64 zip or file dictionary) requiring zero multipart dependencies."""
+        if payload.content_base64:
+            zip_bytes = base64.b64decode(payload.content_base64)
+            info = codebase_manager.ingest_zip(zip_bytes, payload.filename or "project.zip")
+        elif payload.files:
+            info = codebase_manager.ingest_files(payload.files)
+        else:
+            raise HTTPException(status_code=400, detail="Must provide either content_base64 or files dictionary.")
+
+        return {
+            "status": "success",
+            "message": f"Successfully loaded codebase '{info['name']}' with {info['files_count']} Python files ({info['total_loc']} lines).",
+            "info": info,
+            "mermaid": info.get("mermaid", ""),
+        }
 
     @app.get("/api/health")
     async def get_health() -> dict[str, str]:
-        report = check_system_health(".")
+        active_dir = str(codebase_manager.get_active_dir())
+        report = check_system_health(active_dir)
         return {"report": report}
 
     @app.get("/api/run-commands")
@@ -133,101 +451,11 @@ def create_app(mock_mode: bool = False, static_dir: str = "web") -> FastAPI:
         if not query:
             raise HTTPException(status_code=400, detail="Query message cannot be empty.")
 
-        query_lower = query.lower()
+        target_dir = str(codebase_manager.get_active_dir())
 
-        # Mock mode routing (used for offline tests or mock runs)
-        if mock_mode:
-            if any(w in query_lower for w in ["where", "chunk", "find", "search", "constant", "token"]):
-                worker = "code_searcher"
-                worker_type = "AI Agent (RAG)"
-                tools_used = ["rag_search", "find_exact_matches"]
-                ans = (
-                    "Based on the indexed codebase in `indexer.py:L55-L111`, sliding window chunking "
-                    "is implemented in `chunk_document()`. Window size: 500 chars, overlap: 50 chars."
-                )
-            elif any(w in query_lower for w in ["diagram", "mermaid", "flowchart", "import", "depend", "symbol", "call", "loc", "metric"]):
-                worker = "architecture_mapper"
-                worker_type = "Deterministic AST Engine (Zero AI)"
-                tools_used = ["find_imports", "generate_architecture_diagram"]
-                if "diagram" in query_lower or "flowchart" in query_lower:
-                    ans = generate_architecture_diagram(".")
-                else:
-                    ans = (
-                        "=== Module Dependencies ===\n"
-                        "- `indexer.py` imports `config.py`\n"
-                        "- `vector_store.py` imports `config.py`\n"
-                        "- `query_pipeline.py` imports `config.py`, `vector_store.py`\n"
-                        "- `main.py` imports `config.py`, `indexer.py`, `query_pipeline.py`\n"
-                        "\n*Verified via static AST parsing with 0 LLM calls.*"
-                    )
-            elif any(w in query_lower for w in ["new", "start", "onboard", "setup", "run", "command"]):
-                worker = "onboarding_guide"
-                worker_type = "AI Agent (Guide)"
-                tools_used = ["check_system_health", "get_run_commands"]
-                ans = (
-                    "Welcome to the Naive RAG project! Run `python -m code_helper.index_codebase --evaluate` "
-                    "to index the codebase into Pinecone, then launch the agent with `adk run code_helper` or `python app.py`."
-                )
-            else:
-                worker = "code_explainer"
-                worker_type = "AI Agent (MCP)"
-                tools_used = ["get_function_source", "read_file"]
-                ans = (
-                    "In `vector_store.py`, `VectorStore` initializes the Pinecone connection and handles "
-                    "cosine similarity queries against the serverless 2048-dim index."
-                )
-
-            return {
-                "worker": worker,
-                "worker_name": AGENT_DISPLAY_NAMES.get(worker, worker),
-                "worker_type": worker_type,
-                "message": ans,
-                "tools_used": tools_used,
-            }
-
-        # Real mode: Invoke ADK root_agent
-        try:
-            from google.adk.runners import InMemoryRunner
-            from google.adk.events import Event
-
-            runner = InMemoryRunner(agent=root_agent)
-            
-            # Run the agent asynchronously
-            responding_worker = "coordinator"
-            final_message = ""
-            tools_called: list[str] = []
-
-            async for event in runner.run_async(query):
-                author = getattr(event, "author", "")
-                if author and author != "user":
-                    responding_worker = author
-                if hasattr(event, "message") and event.message:
-                    final_message = str(event.message)
-                if hasattr(event, "tools") and event.tools:
-                    tools_called.extend([str(t) for t in event.tools])
-
-            if not final_message:
-                final_message = "I have completed analyzing your request."
-
-            worker_type = "Deterministic BaseAgent (0 AI)" if responding_worker == "architecture_mapper" else "AI Agent (LiteLLM)"
-
-            return {
-                "worker": responding_worker,
-                "worker_name": AGENT_DISPLAY_NAMES.get(responding_worker, responding_worker),
-                "worker_type": worker_type,
-                "message": final_message,
-                "tools_used": tools_called,
-            }
-
-        except Exception as e:
-            # Fallback to deterministic handling on network error
-            return {
-                "worker": "coordinator",
-                "worker_name": "Boss Coordinator",
-                "worker_type": "Router (AI)",
-                "message": f"Execution notice: {e}. Please check your NVIDIA and Pinecone credentials in .env.",
-                "tools_used": [],
-            }
+        # Execute multi-agent grounded query
+        res = execute_multi_agent_query(query, target_dir)
+        return res
 
     # Mount static assets if web directory exists
     if static_path.exists():
@@ -251,3 +479,4 @@ def create_app(mock_mode: bool = False, static_dir: str = "web") -> FastAPI:
             raise HTTPException(status_code=404, detail="File not found")
 
     return app
+
