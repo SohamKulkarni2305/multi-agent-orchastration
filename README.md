@@ -2,7 +2,85 @@
 
 An enterprise multi-agent assistant built on **Google ADK** to help software engineers navigate, search, inspect, and onboard onto the **Naive RAG** codebase.
 
-The assistant employs a hierarchical team composed of **1 Boss Coordinator** and **4 specialized worker agents**, equipped with a custom 5-step RAG pipeline (NVIDIA NIM 2048-dim Nemotron embeddings + Pinecone Serverless), an external Filesystem MCP server, and 7 deterministic AST/code inspection tools.
+The assistant employs a hierarchical team composed of **1 Boss Coordinator** and **4 specialized worker agents**, equipped with a custom 5-step RAG pipeline (NVIDIA NIM 2048-dim Nemotron embeddings + Pinecone Serverless), an external Filesystem MCP server, and 12 deterministic AST/code inspection tools.
+
+---
+
+## Architecture Overview
+
+The system features two interconnected architectural layers:
+1. **Multi-Agent Orchestration & Tool Execution Architecture**: How user requests flow from CLI/Web UI through the Boss Coordinator to specialized AI and deterministic workers.
+2. **Target Codebase Pipeline Architecture**: How the underlying Naive RAG system ingests documents, generates embeddings, and executes grounded retrieval.
+
+### 1. Multi-Agent Orchestration Architecture
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer["🖥️ Client & Interface Layer"]
+        CLI["💻 Google ADK CLI<br/>(adk run / adk web)"]
+        WebUI["🌐 Modern AI Agent Studio<br/>(FastAPI Backend + Interactive Canvas UI)"]
+    end
+
+    subgraph CoordinatorLayer["👑 Orchestration & Routing Layer"]
+        Boss["Boss Coordinator (coordinator)<br/><i>LiteLLM: meta/llama-3.2-11b-vision-instruct</i><br/>• Pure dynamic delegation<br/>• Zero direct answers"]
+    end
+
+    subgraph WorkerLayer["🤖 Specialized Multi-Agent Worker Team"]
+        Searcher["🔍 Code Searcher<br/><b>AI Agent</b><br/>• RAG Pinecone retrieval<br/>• Exact symbol pattern match<br/>• Strict missing fallback"]
+        Mapper["🗺️ Architecture Mapper<br/><b>Deterministic Engine (0 AI)</b><br/>• Standard library AST parsing<br/>• Zero tokens / Zero hallucination<br/>• Dependency & call graphs"]
+        Guide["🚀 Onboarding Guide<br/><b>AI Agent</b><br/>• Repo onboarding & entry points<br/>• System health checks<br/>• .env & setup instructions"]
+        Explainer["📖 Code Explainer<br/><b>AI Agent</b><br/>• Deep algorithmic explanation<br/>• Line-by-line file walkthroughs<br/>• AST function isolation"]
+    end
+
+    subgraph ToolingLayer["🛠️ Tools, MCP & Infrastructure Layer"]
+        RAG["📡 5-Step RAG Pipeline<br/>• NVIDIA Nemotron-3-Embed-1B (2048-dim)<br/>• Pinecone Serverless Index"]
+        ASTTools["⚙️ 12 Deterministic AST Tools<br/>• plain_ast_tools • diagram_tool<br/>• env_scanner • metrics_tool • search_tools"]
+        MCP["🔌 Filesystem MCP Server<br/>• @modelcontextprotocol/server-filesystem<br/>• Live read_file & list_directory"]
+    end
+
+    %% Client to Coordinator
+    CLI --> Boss
+    WebUI --> Boss
+
+    %% Coordinator Dynamic Delegation
+    Boss -->|"Code lookup / constants"| Searcher
+    Boss -->|"Imports, call graph, metrics"| Mapper
+    Boss -->|"Setup, health, getting started"| Guide
+    Boss -->|"Explain files & algorithms"| Explainer
+
+    %% Workers to Tools & Storage
+    Searcher --> RAG
+    Searcher --> ASTTools
+    Mapper --> ASTTools
+    Guide --> ASTTools
+    Explainer --> MCP
+    Explainer --> ASTTools
+```
+
+### 2. Target Codebase Pipeline Architecture (Naive RAG)
+
+```mermaid
+flowchart LR
+    subgraph Ingestion["📥 Document Ingestion & Indexing Pipeline"]
+        Docs["📄 Raw Documents<br/>(data/*.txt)"] --> Indexer["⚙️ indexer.py<br/>• Sliding window (500 chars)<br/>• 50-char overlap"]
+        Indexer --> Embed["🧠 NVIDIA NIM<br/>(nemotron-3-embed-1b)"]
+        Embed --> Pinecone[("🌲 Pinecone Vector DB<br/>(2048-dim Serverless Index)")]
+    end
+
+    subgraph Runtime["⚡ Query & Retrieval Runtime"]
+        UserQuery["❓ User Query"] --> Pipeline["🔄 query_pipeline.py<br/>• Query embedding (input_type=query)<br/>• Similarity search (top-k)"]
+        Pipeline <-->|"Cosine search"| Pinecone
+        Pipeline --> LLMGen["💬 NVIDIA NIM LLM<br/>(llama-3.2-11b)<br/>Synthesize grounded response"]
+        LLMGen --> Output["✨ Answer with file citations"]
+    end
+
+    subgraph ConfigModule["⚙️ Central Configuration"]
+        Config["🔧 config.py<br/>• Environment credentials<br/>• Index names & dimensions<br/>• Model hyperparameters"]
+    end
+
+    Config -.-> Indexer
+    Config -.-> Pipeline
+```
 
 ---
 
