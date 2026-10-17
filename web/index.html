@@ -249,7 +249,10 @@
             <span class="pills-label">Quick Prompts:</span>
             <div class="pills-scroll" id="prompts-container">
               <button class="prompt-pill" data-prompt="Generate an architecture diagram of this project.">
-                <i class="fa-solid fa-diagram-project"></i> Draw Architecture Diagram
+                <i class="fa-solid fa-diagram-project"></i> Project Dependencies
+              </button>
+              <button class="prompt-pill" data-prompt="Show multi-agent orchestration architecture diagram.">
+                <i class="fa-solid fa-network-wired"></i> Orchestration Architecture
               </button>
               <button class="prompt-pill" data-prompt="Which files import the config module?">
                 <i class="fa-solid fa-sitemap"></i> Which files import config?
@@ -312,8 +315,9 @@
             <!-- File Selector for File-Centric Architecture Diagrams -->
             <div class="arch-file-selector-box">
               <label for="arch-file-select"><i class="fa-solid fa-file-code"></i></label>
-              <select id="arch-file-select" class="arch-file-dropdown" title="Select a file to view its dedicated architecture diagram">
-                <option value="">🌐 Entire Project (Overview)</option>
+              <select id="arch-file-select" class="arch-file-dropdown" title="Select a file or view system architecture">
+                <option value="">🌐 Entire Project (Dependencies)</option>
+                <option value="__orchestration__">⚡ Multi-Agent System Architecture</option>
               </select>
             </div>
 

@@ -6,80 +6,101 @@ The assistant employs a hierarchical team composed of **1 Boss Coordinator** and
 
 ---
 
-## Architecture Overview
+## Multi-Agent Orchestration Architecture
 
-The system features two interconnected architectural layers:
-1. **Multi-Agent Orchestration & Tool Execution Architecture**: How user requests flow from CLI/Web UI through the Boss Coordinator to specialized AI and deterministic workers.
-2. **Target Codebase Pipeline Architecture**: How the underlying Naive RAG system ingests documents, generates embeddings, and executes grounded retrieval.
+The system implements a hierarchical multi-agent orchestration architecture on top of **Google ADK**. Developer requests arrive through the **Ingress Layer** and are received by the **Boss Coordinator**, which performs zero-shot intent classification and dynamically delegates execution to the single most appropriate specialist worker.
 
-### 1. Multi-Agent Orchestration Architecture
+<p align="center">
+  <img src="docs/assets/multi_agent_architecture.svg" alt="Multi-Agent Orchestration Architecture" width="100%">
+</p>
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer["🖥️ Client & Interface Layer"]
-        CLI["💻 Google ADK CLI<br/>(adk run / adk web)"]
-        WebUI["🌐 Modern AI Agent Studio<br/>(FastAPI Backend + Interactive Canvas UI)"]
+    %% -------------------------------------------------------------
+    %% Multi-Agent Orchestration Architecture
+    %% -------------------------------------------------------------
+
+    subgraph Clients["Ingress & Presentation Layer"]
+        direction LR
+        CLI["Developer CLI<br/><small>Google ADK Terminal REPL</small>"]
+        WebUI["Modern Agent Studio<br/><small>FastAPI + Dynamic Canvas Router</small>"]
     end
 
-    subgraph CoordinatorLayer["👑 Orchestration & Routing Layer"]
-        Boss["Boss Coordinator (coordinator)<br/><i>LiteLLM: meta/llama-3.2-11b-vision-instruct</i><br/>• Pure dynamic delegation<br/>• Zero direct answers"]
+    subgraph Gateway["Orchestration & Routing Gateway"]
+        Coordinator["Boss Coordinator (coordinator)<br/><small>Llama-3.2-11B via Google ADK</small><br/><b>Dynamic Intent Classification & Delegation</b>"]
     end
 
-    subgraph WorkerLayer["🤖 Specialized Multi-Agent Worker Team"]
-        Searcher["🔍 Code Searcher<br/><b>AI Agent</b><br/>• RAG Pinecone retrieval<br/>• Exact symbol pattern match<br/>• Strict missing fallback"]
-        Mapper["🗺️ Architecture Mapper<br/><b>Deterministic Engine (0 AI)</b><br/>• Standard library AST parsing<br/>• Zero tokens / Zero hallucination<br/>• Dependency & call graphs"]
-        Guide["🚀 Onboarding Guide<br/><b>AI Agent</b><br/>• Repo onboarding & entry points<br/>• System health checks<br/>• .env & setup instructions"]
-        Explainer["📖 Code Explainer<br/><b>AI Agent</b><br/>• Deep algorithmic explanation<br/>• Line-by-line file walkthroughs<br/>• AST function isolation"]
+    subgraph Workers["Specialized Worker Agent Team"]
+        direction TB
+        subgraph Col1["Search & Structural Intelligence"]
+            Searcher["Code Searcher<br/><small>Hybrid Dense Vector & Token Retrieval</small>"]
+            Mapper["Architecture Mapper<br/><small>Deterministic Python AST Engine (Zero LLM)</small>"]
+        end
+        subgraph Col2["Guidance & Source Walkthrough"]
+            Guide["Onboarding Guide<br/><small>Orientation & System Diagnostics</small>"]
+            Explainer["Code Explainer<br/><small>Deep Algorithmic Analysis via MCP</small>"]
+        end
     end
 
-    subgraph ToolingLayer["🛠️ Tools, MCP & Infrastructure Layer"]
-        RAG["📡 5-Step RAG Pipeline<br/>• NVIDIA Nemotron-3-Embed-1B (2048-dim)<br/>• Pinecone Serverless Index"]
-        ASTTools["⚙️ 12 Deterministic AST Tools<br/>• plain_ast_tools • diagram_tool<br/>• env_scanner • metrics_tool • search_tools"]
-        MCP["🔌 Filesystem MCP Server<br/>• @modelcontextprotocol/server-filesystem<br/>• Live read_file & list_directory"]
+    subgraph Capabilities["Inspection & Execution Subsystems"]
+        direction LR
+        RAGPipeline["Hybrid Retrieval Engine<br/><small>500-char Code Chunker & Vector Search</small>"]
+        ASTEngine["Static AST Engine<br/><small>12 Deterministic AST Inspection Tools</small>"]
+        Diagnostics["Environment Diagnostics<br/><small>System Health & Safe .env Scanner</small>"]
+        MCPServer["Filesystem MCP Server<br/><small>Stdio IPC Dynamic File Streaming</small>"]
     end
 
-    %% Client to Coordinator
-    CLI --> Boss
-    WebUI --> Boss
-
-    %% Coordinator Dynamic Delegation
-    Boss -->|"Code lookup / constants"| Searcher
-    Boss -->|"Imports, call graph, metrics"| Mapper
-    Boss -->|"Setup, health, getting started"| Guide
-    Boss -->|"Explain files & algorithms"| Explainer
-
-    %% Workers to Tools & Storage
-    Searcher --> RAG
-    Searcher --> ASTTools
-    Mapper --> ASTTools
-    Guide --> ASTTools
-    Explainer --> MCP
-    Explainer --> ASTTools
-```
-
-### 2. Target Codebase Pipeline Architecture (Naive RAG)
-
-```mermaid
-flowchart LR
-    subgraph Ingestion["📥 Document Ingestion & Indexing Pipeline"]
-        Docs["📄 Raw Documents<br/>(data/*.txt)"] --> Indexer["⚙️ indexer.py<br/>• Sliding window (500 chars)<br/>• 50-char overlap"]
-        Indexer --> Embed["🧠 NVIDIA NIM<br/>(nemotron-3-embed-1b)"]
-        Embed --> Pinecone[("🌲 Pinecone Vector DB<br/>(2048-dim Serverless Index)")]
+    subgraph StorageTier["Data & Cloud Services"]
+        direction LR
+        PineconeDB[("Pinecone Serverless<br/><small>2048-dim Nemotron Index</small>")]
+        NimAPI["NVIDIA NIM Cloud<br/><small>Llama-3.2-11B / Nemotron-3-Embed</small>"]
+        LocalRepo[("Target Codebase<br/><small>Local Python Workspace</small>")]
     end
 
-    subgraph Runtime["⚡ Query & Retrieval Runtime"]
-        UserQuery["❓ User Query"] --> Pipeline["🔄 query_pipeline.py<br/>• Query embedding (input_type=query)<br/>• Similarity search (top-k)"]
-        Pipeline <-->|"Cosine search"| Pinecone
-        Pipeline --> LLMGen["💬 NVIDIA NIM LLM<br/>(llama-3.2-11b)<br/>Synthesize grounded response"]
-        LLMGen --> Output["✨ Answer with file citations"]
-    end
+    %% Ingress Flow
+    CLI -->|"Developer Query"| Coordinator
+    WebUI -->|"REST / Canvas Event"| Coordinator
 
-    subgraph ConfigModule["⚙️ Central Configuration"]
-        Config["🔧 config.py<br/>• Environment credentials<br/>• Index names & dimensions<br/>• Model hyperparameters"]
-    end
+    %% Task Delegation Flow
+    Coordinator -->|"Task: Code lookup & constants"| Searcher
+    Coordinator -->|"Task: Module dependencies & call graph"| Mapper
+    Coordinator -->|"Task: Environment audit & setup"| Guide
+    Coordinator -->|"Task: Function walkthroughs"| Explainer
 
-    Config -.-> Indexer
-    Config -.-> Pipeline
+    %% Worker to Subsystems
+    Searcher -->|"Queries index"| RAGPipeline
+    Searcher -.->|"Exact pattern match"| ASTEngine
+    Mapper -->|"Traverses syntax tree"| ASTEngine
+    Guide -->|"Runs diagnostics"| Diagnostics
+    Explainer -->|"Streams source files"| MCPServer
+    Explainer -.->|"Isolates function AST"| ASTEngine
+
+    %% Subsystems to Storage & Cloud
+    RAGPipeline -->|"Cosine vector search"| PineconeDB
+    RAGPipeline -->|"Generates embeddings"| NimAPI
+    ASTEngine -->|"Parses source"| LocalRepo
+    Diagnostics -->|"Audits runtime & .env"| LocalRepo
+    MCPServer -->|"Reads on-demand via Stdio"| LocalRepo
+    Coordinator -.->|"Intent reasoning"| NimAPI
+
+    %% Styling Classes
+    classDef clientStyle fill:#1e293b,stroke:#475569,stroke-width:1.5px,color:#f8fafc;
+    classDef coordStyle fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+    classDef searcherStyle fill:#0b1c28,stroke:#06b6d4,stroke-width:1.5px,color:#cffafe;
+    classDef mapperStyle fill:#072019,stroke:#10b981,stroke-width:1.5px,color:#d1fae5;
+    classDef guideStyle fill:#24180a,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7;
+    classDef explainerStyle fill:#250b12,stroke:#f43f5e,stroke-width:1.5px,color:#ffe4e6;
+    classDef subEngineStyle fill:#0f172a,stroke:#334155,stroke-width:1.2px,color:#e2e8f0;
+    classDef storageStyle fill:#18142e,stroke:#4338ca,stroke-width:1.2px,color:#c7d2fe;
+
+    class CLI,WebUI clientStyle;
+    class Coordinator coordStyle;
+    class Searcher searcherStyle;
+    class Mapper mapperStyle;
+    class Guide guideStyle;
+    class Explainer explainerStyle;
+    class RAGPipeline,ASTEngine,Diagnostics,MCPServer subEngineStyle;
+    class PineconeDB,NimAPI,LocalRepo storageStyle;
 ```
 
 ---

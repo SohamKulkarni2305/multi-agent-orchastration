@@ -407,7 +407,8 @@ class DiagramViewer {
   updateFileList(files = []) {
     if (!this.fileSelect || !files) return;
     const currentVal = this.fileSelect.value;
-    let html = '<option value="">🌐 Entire Project (Overview)</option>';
+    let html = '<option value="">🌐 Entire Project (Dependencies)</option>';
+    html += '<option value="__orchestration__">⚡ Multi-Agent System Architecture</option>';
     files.forEach((f) => {
       const name = typeof f === 'string' ? f : (f.name || f.path || '');
       if (name && name.endsWith('.py')) {

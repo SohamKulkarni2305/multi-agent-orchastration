@@ -266,12 +266,124 @@ def generate_file_architecture_diagram(file_identifier: str, project_dir: str = 
     return desc
 
 
+def generate_orchestration_architecture_diagram() -> str:
+    """
+    Generate the clean, natural multi-agent orchestration architecture diagram (Mermaid flowchart).
+    """
+    mermaid = """```mermaid
+flowchart TD
+    %% -------------------------------------------------------------
+    %% Multi-Agent Orchestration Architecture
+    %% -------------------------------------------------------------
+
+    subgraph Clients["Ingress & Presentation Layer"]
+        direction LR
+        CLI["Developer CLI<br/><small>Google ADK Terminal REPL</small>"]
+        WebUI["Modern Agent Studio<br/><small>FastAPI + Dynamic Canvas Router</small>"]
+    end
+
+    subgraph Gateway["Orchestration & Routing Gateway"]
+        Coordinator["Boss Coordinator (coordinator)<br/><small>Llama-3.2-11B via Google ADK</small><br/><b>Dynamic Intent Classification & Delegation</b>"]
+    end
+
+    subgraph Workers["Specialized Worker Agent Team"]
+        direction TB
+        subgraph Col1["Search & Structural Intelligence"]
+            Searcher["Code Searcher<br/><small>Hybrid Dense Vector & Token Retrieval</small>"]
+            Mapper["Architecture Mapper<br/><small>Deterministic Python AST Engine (Zero LLM)</small>"]
+        end
+        subgraph Col2["Guidance & Source Walkthrough"]
+            Guide["Onboarding Guide<br/><small>Orientation & System Diagnostics</small>"]
+            Explainer["Code Explainer<br/><small>Deep Algorithmic Analysis via MCP</small>"]
+        end
+    end
+
+    subgraph Capabilities["Inspection & Execution Subsystems"]
+        direction LR
+        RAGPipeline["Hybrid Retrieval Engine<br/><small>500-char Code Chunker & Vector Search</small>"]
+        ASTEngine["Static AST Engine<br/><small>12 Deterministic AST Inspection Tools</small>"]
+        Diagnostics["Environment Diagnostics<br/><small>System Health & Safe .env Scanner</small>"]
+        MCPServer["Filesystem MCP Server<br/><small>Stdio IPC Dynamic File Streaming</small>"]
+    end
+
+    subgraph StorageTier["Data & Cloud Services"]
+        direction LR
+        PineconeDB[("Pinecone Serverless<br/><small>2048-dim Nemotron Index</small>")]
+        NimAPI["NVIDIA NIM Cloud<br/><small>Llama-3.2-11B / Nemotron-3-Embed</small>"]
+        LocalRepo[("Target Codebase<br/><small>Local Python Workspace</small>")]
+    end
+
+    %% Ingress Flow
+    CLI -->|"Developer Query"| Coordinator
+    WebUI -->|"REST / Canvas Event"| Coordinator
+
+    %% Task Delegation Flow
+    Coordinator -->|"Task: Code lookup & constants"| Searcher
+    Coordinator -->|"Task: Module dependencies & call graph"| Mapper
+    Coordinator -->|"Task: Environment audit & setup"| Guide
+    Coordinator -->|"Task: Function walkthroughs"| Explainer
+
+    %% Worker to Subsystems
+    Searcher -->|"Queries index"| RAGPipeline
+    Searcher -.->|"Exact pattern match"| ASTEngine
+    Mapper -->|"Traverses syntax tree"| ASTEngine
+    Guide -->|"Runs diagnostics"| Diagnostics
+    Explainer -->|"Streams source files"| MCPServer
+    Explainer -.->|"Isolates function AST"| ASTEngine
+
+    %% Subsystems to Storage & Cloud
+    RAGPipeline -->|"Cosine vector search"| PineconeDB
+    RAGPipeline -->|"Generates embeddings"| NimAPI
+    ASTEngine -->|"Parses source"| LocalRepo
+    Diagnostics -->|"Audits runtime & .env"| LocalRepo
+    MCPServer -->|"Reads on-demand via Stdio"| LocalRepo
+    Coordinator -.->|"Intent reasoning"| NimAPI
+
+    %% Styling Classes
+    classDef clientStyle fill:#1e293b,stroke:#475569,stroke-width:1.5px,color:#f8fafc;
+    classDef coordStyle fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+    classDef searcherStyle fill:#0b1c28,stroke:#06b6d4,stroke-width:1.5px,color:#cffafe;
+    classDef mapperStyle fill:#072019,stroke:#10b981,stroke-width:1.5px,color:#d1fae5;
+    classDef guideStyle fill:#24180a,stroke:#f59e0b,stroke-width:1.5px,color:#fef3c7;
+    classDef explainerStyle fill:#250b12,stroke:#f43f5e,stroke-width:1.5px,color:#ffe4e6;
+    classDef subEngineStyle fill:#0f172a,stroke:#334155,stroke-width:1.2px,color:#e2e8f0;
+    classDef storageStyle fill:#18142e,stroke:#4338ca,stroke-width:1.2px,color:#c7d2fe;
+
+    class CLI,WebUI clientStyle;
+    class Coordinator coordStyle;
+    class Searcher searcherStyle;
+    class Mapper mapperStyle;
+    class Guide guideStyle;
+    class Explainer explainerStyle;
+    class RAGPipeline,ASTEngine,Diagnostics,MCPServer subEngineStyle;
+    class PineconeDB,NimAPI,LocalRepo storageStyle;
+```"""
+    return (
+        "=== Multi-Agent Orchestration Architecture (Mermaid) ===\n\n"
+        + mermaid
+        + "\n\n*Hierarchical delegation topology: 1 Boss Coordinator, 4 specialized workers, RAG + deterministic AST intelligence.*"
+    )
+
+
 def generate_architecture_diagram(project_dir: str = ".", target_file: str | None = None) -> str:
     """
     Generate a clean, valid Mermaid flowchart diagram (graph TD).
     If target_file is provided: generates a dedicated file-centric architecture diagram.
     If target_file is None: generates a comprehensive project-wide architecture diagram.
     """
+    # If target_file requests the orchestration diagram
+    if target_file and target_file.strip().lower() in (
+        "__orchestration__",
+        "orchestration",
+        "multi_agent",
+        "multi-agent",
+        "multi-agent-orchestration",
+        "multi_agent_orchestration",
+        "agents",
+        "team",
+    ):
+        return generate_orchestration_architecture_diagram()
+
     root = Path(project_dir).resolve()
     if not root.exists():
         return f"Error: Project directory '{project_dir}' not found."

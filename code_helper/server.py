@@ -157,24 +157,28 @@ def execute_multi_agent_query(query: str, target_dir: str) -> dict[str, Any]:
         target_file: str | None = None
 
         if any(w in query_lower for w in ["diagram", "mermaid", "flowchart", "draw", "architecture"]):
-            # Check if user mentioned a specific file or module
-            for p in py_files:
-                if p.name.lower() in query_lower:
-                    target_file = p.name
-                    break
-                elif len(p.stem) >= 3 and p.stem.lower() in query_lower.split():
-                    target_file = p.name
-                    break
-
-            if not target_file:
-                for word in query_lower.split():
-                    clean_w = word.strip(" '\"`:,")
-                    for p in py_files:
-                        if clean_w == p.name.lower() or (len(clean_w) >= 3 and clean_w == p.stem.lower()):
-                            target_file = p.name
-                            break
-                    if target_file:
+            # Check if user is asking for the multi-agent orchestration architecture
+            if any(k in query_lower for k in ["multi-agent", "multi agent", "orchestration", "agent team", "coordinator", "agent architecture"]):
+                target_file = "__orchestration__"
+            else:
+                # Check if user mentioned a specific file or module
+                for p in py_files:
+                    if p.name.lower() in query_lower:
+                        target_file = p.name
                         break
+                    elif len(p.stem) >= 3 and p.stem.lower() in query_lower.split():
+                        target_file = p.name
+                        break
+
+                if not target_file:
+                    for word in query_lower.split():
+                        clean_w = word.strip(" '\"`:,")
+                        for p in py_files:
+                            if clean_w == p.name.lower() or (len(clean_w) >= 3 and clean_w == p.stem.lower()):
+                                target_file = p.name
+                                break
+                        if target_file:
+                            break
 
             tools_used.append("generate_architecture_diagram")
             raw_diag = generate_architecture_diagram(str(root_path), target_file=target_file)
@@ -183,7 +187,17 @@ def execute_multi_agent_query(query: str, target_dir: str) -> dict[str, Any]:
             else:
                 clean_mermaid = raw_diag.strip()
 
-            if target_file:
+            if target_file == "__orchestration__":
+                ans = (
+                    "### Multi-Agent Orchestration Architecture\n\n"
+                    "Here is the system architecture diagram for the Multi-Agent Code Helper orchestration topology:\n"
+                    "- **Ingress Layer**: Developer CLI & Modern Agent Studio Web UI\n"
+                    "- **Orchestration Gateway**: Boss Coordinator (`coordinator`)\n"
+                    "- **Specialized Workers**: Code Searcher, Architecture Mapper (deterministic AST), Onboarding Guide, Code Explainer\n"
+                    "- **Subsystems & Storage**: 5-step RAG Pipeline, Filesystem MCP Server, Pinecone Serverless & NVIDIA NIM Cloud.\n\n"
+                    "Click **Open Diagram View** below to inspect the full interactive diagram."
+                )
+            elif target_file:
                 ans = (
                     f"### Dedicated Architecture Flowchart for `{target_file}`\n\n"
                     f"I parsed `{target_file}` via deterministic Python AST to map its internal function call graph, "
